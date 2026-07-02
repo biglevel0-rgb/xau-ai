@@ -27,13 +27,15 @@ validator:
   confidence_threshold: 0.85
   # Weight keys MUST match skill names. Calibrated on backtest results (Stage 6).
   # Must sum to ~1.0. `session` is a NEUTRAL liquidity filter, not weighted here.
+  # Calibrated on 5000 real M5 bars (2026-07-03, metric=expectancy, +0.32R/25 trades):
+  # order_block emphasis won. Re-run `xau calibrate` periodically to refresh.
   weights:
-    trend: 0.22
-    market_structure: 0.22
-    liquidity: 0.18
-    order_block: 0.13
-    fvg: 0.13
-    correlation: 0.12
+    trend: 0.143
+    market_structure: 0.143
+    liquidity: 0.143
+    order_block: 0.285
+    fvg: 0.143
+    correlation: 0.143
   # Skills that MUST agree with the signal direction, else NO_TRADE.
   # Tighten toward full confluence (add liquidity, order_block, fvg) as desired.
   required_confirmations:
