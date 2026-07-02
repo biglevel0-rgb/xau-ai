@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from xau_ai.cli import main
+from xau_ai.cli import _maybe_notify, main
+from xau_ai.config.settings import NotificationsConfig, TelegramConfig
+from xau_ai.core.models import Signal, SignalType, Timeframe
+
+from .conftest import make_settings
 
 _CSV = """timestamp,open,high,low,close,volume
 2026-07-02T15:00:00,3350,3352,3349,3351,100
@@ -154,3 +159,58 @@ def test_backtest_missing_file_returns_1(
     code = main(["backtest", "--dir", str(tmp_path), "--tf", "M5", "--config", str(config_path)])
     assert code == 1
     assert "error" in capsys.readouterr().out
+
+
+AS_OF = datetime(2026, 7, 2, 15, 0, 0)
+
+
+def _no_trade_signal() -> Signal:
+    return Signal(
+        signal_type=SignalType.NO_TRADE,
+        symbol="XAUUSD",
+        timeframe=Timeframe.M5,
+        as_of=AS_OF,
+        confidence=0.4,
+    )
+
+
+def _long_signal() -> Signal:
+    return Signal(
+        signal_type=SignalType.LONG,
+        symbol="XAUUSD",
+        timeframe=Timeframe.M5,
+        as_of=AS_OF,
+        confidence=0.9,
+        entry=3352.6,
+        stop_loss=3348.9,
+        risk_reward=2.8,
+    )
+
+
+def test_maybe_notify_disabled(capsys: pytest.CaptureFixture[str]) -> None:
+    settings = make_settings().model_copy(
+        update={"notifications": NotificationsConfig(telegram=TelegramConfig(enabled=False))}
+    )
+    _maybe_notify(settings, _long_signal())
+    assert "disabled" in capsys.readouterr().out
+
+
+def test_maybe_notify_skips_no_trade(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    _maybe_notify(make_settings(), _no_trade_signal())  # NO_TRADE -> skipped, no token needed
+    assert "skipped" in capsys.readouterr().out
+
+
+def test_maybe_notify_reports_error_without_token(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("xau_ai.config.settings.Secrets", lambda: _NoSecrets())
+    _maybe_notify(make_settings(), _long_signal())
+    assert "notify error" in capsys.readouterr().out
+
+
+class _NoSecrets:
+    telegram_bot_token = ""
+    telegram_owner_chat_id = 0

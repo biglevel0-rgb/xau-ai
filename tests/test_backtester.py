@@ -53,9 +53,7 @@ class FakeSource:
         )
 
 
-def _run(
-    rows: list[OHLC], signal_type: SignalType, trigger_len: int = 5
-) -> list[TradeResult]:
+def _run(rows: list[OHLC], signal_type: SignalType, trigger_len: int = 5) -> list[TradeResult]:
     candles = ohlc_candles(rows)
     source = FakeSource(trigger_len, signal_type)
     return Backtester(source, warmup=3).run(candles)

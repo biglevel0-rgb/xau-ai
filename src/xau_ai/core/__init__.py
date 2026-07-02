@@ -4,6 +4,7 @@ from xau_ai.core.context import build_context
 from xau_ai.core.exceptions import (
     ConfigError,
     DataProviderError,
+    NotificationError,
     SkillError,
     XauAiError,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "DataProviderError",
     "Direction",
     "MarketContext",
+    "NotificationError",
     "Signal",
     "SignalType",
     "SkillError",

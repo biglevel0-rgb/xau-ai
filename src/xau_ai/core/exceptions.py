@@ -21,3 +21,7 @@ class DataProviderError(XauAiError):
 
 class SkillError(XauAiError):
     """A skill failed during analysis or was registered incorrectly."""
+
+
+class NotificationError(XauAiError):
+    """A notification channel is misconfigured or failed to deliver."""

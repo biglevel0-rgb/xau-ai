@@ -104,7 +104,33 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
         print(f"error: {exc}")
         return 1
     _print_signal(signal)
+    if args.notify:
+        _maybe_notify(settings, signal)
     return 0
+
+
+def _maybe_notify(settings: object, signal: Signal) -> None:
+    from xau_ai.config.settings import Secrets, Settings
+    from xau_ai.core.exceptions import NotificationError
+    from xau_ai.notifications.telegram import TelegramNotifier
+
+    assert isinstance(settings, Settings)
+    telegram = settings.notifications.telegram
+    if not telegram.enabled:
+        print("  (telegram disabled)")
+        return
+    secrets = Secrets()
+    notifier = TelegramNotifier(
+        secrets.telegram_bot_token,
+        secrets.telegram_owner_chat_id,
+        telegram.send_on,
+    )
+    try:
+        sent = notifier.notify(signal)
+    except NotificationError as exc:
+        print(f"  notify error: {exc}")
+        return
+    print("  telegram: sent" if sent else "  telegram: skipped (not an actionable signal)")
 
 
 def _cmd_backtest(args: argparse.Namespace) -> int:
@@ -164,6 +190,9 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--tf", default="M5", help="signal timeframe (single)")
     analyze.add_argument("--count", type=int, default=300)
     analyze.add_argument("--config", default="config/settings.yaml")
+    analyze.add_argument(
+        "--notify", action="store_true", help="send LONG/SHORT to Telegram (owner-only)"
+    )
     analyze.set_defaults(func=_cmd_analyze)
 
     backtest = sub.add_parser("backtest", help="simulate the strategy over history")
