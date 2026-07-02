@@ -60,7 +60,7 @@ class ForecastStats(BaseModel):
 class ForecastTracker:
     """Append-only JSONL journal of forecasts with delayed grading."""
 
-    def __init__(self, path: str | Path, horizon_min: int = 30, keep_days: int = 14) -> None:
+    def __init__(self, path: str | Path, horizon_min: int = 30, keep_days: int = 35) -> None:
         self._path = Path(path)
         self._horizon = horizon_min
         self._keep = timedelta(days=keep_days)

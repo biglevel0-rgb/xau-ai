@@ -43,16 +43,41 @@ pick_sleep() {
     fi
 }
 
-maybe_daily_report() {
+# On the very first start, initialise period markers so we don't immediately
+# blast weekly/monthly reports built on an empty journal.
+init_report_markers() {
+    mkdir -p journal
+    [ -f journal/.last_weekly ] || date -u +%G-W%V > journal/.last_weekly
+    [ -f journal/.last_monthly ] || date -u +%Y-%m > journal/.last_monthly
+}
+
+maybe_reports() {
     hour=$(date -u +%H)
+    [ "$hour" -lt "$REPORT_HOUR" ] && return 0
+
     today=$(date -u +%F)
-    last=$(cat journal/.last_report 2>/dev/null || echo "")
-    if [ "$hour" -ge "$REPORT_HOUR" ] && [ "$last" != "$today" ]; then
-        xau report --config "${CONFIG}" --notify \
+    if [ "$(cat journal/.last_report 2>/dev/null)" != "$today" ]; then
+        xau report --period daily --config "${CONFIG}" --notify \
             && echo "$today" > journal/.last_report \
             || echo "daily report failed (continuing)"
     fi
+
+    week=$(date -u +%G-W%V)
+    if [ "$(cat journal/.last_weekly 2>/dev/null)" != "$week" ]; then
+        xau report --period weekly --config "${CONFIG}" --notify \
+            && echo "$week" > journal/.last_weekly \
+            || echo "weekly report failed (continuing)"
+    fi
+
+    month=$(date -u +%Y-%m)
+    if [ "$(cat journal/.last_monthly 2>/dev/null)" != "$month" ]; then
+        xau report --period monthly --config "${CONFIG}" --notify \
+            && echo "$month" > journal/.last_monthly \
+            || echo "monthly report failed (continuing)"
+    fi
 }
+
+init_report_markers
 
 while true; do
     if [ "$SCHEDULE" = "auto" ] && market_closed; then
@@ -77,6 +102,6 @@ while true; do
             --notify || echo "analyze cycle failed (continuing)"
     fi
 
-    maybe_daily_report
+    maybe_reports
     sleep "$(pick_sleep)"
 done

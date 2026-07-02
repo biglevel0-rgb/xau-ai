@@ -451,6 +451,43 @@ def test_report_empty_journal(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert "no graded forecasts yet" in out
 
 
+def test_report_weekly_and_monthly_periods(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from datetime import UTC, timedelta
+    from datetime import datetime as dt
+
+    from xau_ai.forecasting.tracker import ForecastTracker
+
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    journal = tmp_path / "forecasts.jsonl"
+    tracker = ForecastTracker(journal)
+    now = dt.now(UTC).replace(tzinfo=None)
+    tracker.record(now - timedelta(days=5), "LONG", 0.6, 3300.0)  # inside week, outside day
+
+    code = main(
+        ["report", "--period", "weekly", "--journal", str(journal), "--config", str(config)]
+    )
+    weekly_out = capsys.readouterr().out
+    assert code == 0
+    assert "weekly report (last 168h)" in weekly_out
+    assert "Forecasts: 1" in weekly_out
+
+    code = main(
+        ["report", "--period", "monthly", "--journal", str(journal), "--config", str(config)]
+    )
+    monthly_out = capsys.readouterr().out
+    assert code == 0
+    assert "monthly report (last 720h)" in monthly_out
+
+    code = main(["report", "--journal", str(journal), "--config", str(config)])  # daily default
+    daily_out = capsys.readouterr().out
+    assert code == 0
+    assert "daily report (last 24h)" in daily_out
+    assert "Forecasts: 0" in daily_out  # 5-day-old record outside the daily window
+
+
 AS_OF = datetime(2026, 7, 2, 15, 0, 0)
 
 

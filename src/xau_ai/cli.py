@@ -357,22 +357,33 @@ def _send_forecast(settings: object, text: str) -> None:
         print(f"  notify error: {exc}")
 
 
+_REPORT_PERIODS: dict[str, tuple[int, str]] = {
+    "daily": (24, "📊"),
+    "weekly": (168, "📈"),
+    "monthly": (720, "🗓"),
+}
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
-    """Daily accuracy summary built from the forecast journal."""
+    """Accuracy summary (daily/weekly/monthly) built from the forecast journal."""
     from datetime import UTC, datetime
 
     from xau_ai.forecasting.tracker import ForecastTracker
+
+    window, icon = _REPORT_PERIODS[args.period]
+    if args.window is not None:
+        window = args.window
 
     try:
         settings = load_settings(args.config)
         tracker = ForecastTracker(args.journal)
         now = datetime.now(UTC).replace(tzinfo=None)
-        stats = tracker.stats(now, window_hours=args.window)
+        stats = tracker.stats(now, window_hours=window)
     except XauAiError as exc:
         print(f"error: {exc}")
         return 1
 
-    lines = [f"📊 XAU-AI daily report (last {args.window}h)"]
+    lines = [f"{icon} XAU-AI {args.period} report (last {window}h)"]
     lines.append(f"Forecasts: {stats.total} (pending {stats.pending}, flat {stats.skipped})")
     if stats.correct + stats.wrong > 0:
         lines.append(f"Accuracy: {stats.accuracy:.0%} ({stats.correct}✓ / {stats.wrong}✗)")
@@ -458,7 +469,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     report = sub.add_parser("report", help="accuracy summary from the forecast journal")
     report.add_argument("--journal", default="journal/forecasts.jsonl")
-    report.add_argument("--window", type=int, default=24, help="hours to summarise")
+    report.add_argument("--period", default="daily", choices=sorted(_REPORT_PERIODS))
+    report.add_argument("--window", type=int, default=None, help="override window, hours")
     report.add_argument("--config", default="config/settings.yaml")
     report.add_argument("--notify", action="store_true", help="send to Telegram (owner-only)")
     report.set_defaults(func=_cmd_report)
