@@ -161,6 +161,38 @@ def test_backtest_missing_file_returns_1(
     assert "error" in capsys.readouterr().out
 
 
+def test_calibrate_prints_best_weights(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = _seed_analyze(tmp_path)
+    config_path.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(
+        [
+            "calibrate",
+            "--dir",
+            str(tmp_path),
+            "--tf",
+            "M5",
+            "--warmup",
+            "55",
+            "--config",
+            str(config_path),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "CALIBRATION" in out
+    assert "Best weights" in out
+
+
+def test_calibrate_missing_file_returns_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["calibrate", "--dir", str(tmp_path), "--tf", "M5", "--config", str(config_path)])
+    assert code == 1
+    assert "error" in capsys.readouterr().out
+
+
 AS_OF = datetime(2026, 7, 2, 15, 0, 0)
 
 

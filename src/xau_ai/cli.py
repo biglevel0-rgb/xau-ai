@@ -173,6 +173,34 @@ def _print_report(report: object, bars: int) -> None:
     print("-" * 44)
 
 
+def _cmd_calibrate(args: argparse.Namespace) -> int:
+    from xau_ai.calibration.calibrator import Calibrator
+
+    try:
+        settings = load_settings(args.config)
+        timeframe = _parse_timeframes(args.tf)[0]
+        provider = CsvDataProvider(Path(args.dir))
+        candles = provider.get_candles(args.symbol, timeframe, args.count)
+        calibrator = Calibrator(settings, timeframe, warmup=args.warmup, symbol=args.symbol)
+        result = calibrator.calibrate(candles, metric=args.metric)
+    except XauAiError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    print("-" * 44)
+    print(f"  CALIBRATION  (metric: {args.metric})")
+    print("-" * 44)
+    print(f"  Best score:  {result.best_score:+.3f}")
+    print("  Best weights:")
+    for name, weight in sorted(result.best_weights.items()):
+        print(f"    {name:>18}: {weight:.3f}")
+    print(f"  Trades:      {result.best_report.trades}")
+    print(f"  Win rate:    {result.best_report.win_rate:.1%}")
+    print(f"  Expectancy:  {result.best_report.expectancy_r:+.2f} R")
+    print("-" * 44)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xau", description="XAU-AI command line.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -203,6 +231,18 @@ def _build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--warmup", type=int, default=60)
     backtest.add_argument("--config", default="config/settings.yaml")
     backtest.set_defaults(func=_cmd_backtest)
+
+    calibrate = sub.add_parser("calibrate", help="tune validator weights on history")
+    calibrate.add_argument("--dir", required=True, help="directory with <SYMBOL>_<TF>.csv files")
+    calibrate.add_argument("--symbol", default="XAUUSD")
+    calibrate.add_argument("--tf", default="M5", help="signal timeframe (single)")
+    calibrate.add_argument("--count", type=int, default=5000)
+    calibrate.add_argument("--warmup", type=int, default=60)
+    calibrate.add_argument(
+        "--metric", default="expectancy", choices=["expectancy", "profit_factor", "total_r"]
+    )
+    calibrate.add_argument("--config", default="config/settings.yaml")
+    calibrate.set_defaults(func=_cmd_calibrate)
     return parser
 
 
