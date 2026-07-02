@@ -1,0 +1,23 @@
+# Keep the build context small and secret-free.
+.git
+.gitignore
+.gitattributes
+.venv
+venv
+env
+__pycache__
+*.pyc
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+tests
+data_cache
+logs
+journal
+docs
+# Never bake secrets into the image (compose supplies them via env_file at runtime).
+.env
+*.env
+!.env.example
