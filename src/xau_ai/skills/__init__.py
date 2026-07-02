@@ -9,13 +9,19 @@ Importing this package registers all built-in skills with the global
 """
 
 from xau_ai.skills.base import BaseSkill
+from xau_ai.skills.fvg import FvgSkill
+from xau_ai.skills.liquidity import LiquiditySkill
 from xau_ai.skills.market_structure import MarketStructureSkill
+from xau_ai.skills.order_blocks import OrderBlockSkill
 from xau_ai.skills.sessions import SessionSkill
 from xau_ai.skills.trend import TrendSkill
 
 __all__ = [
     "BaseSkill",
+    "FvgSkill",
+    "LiquiditySkill",
     "MarketStructureSkill",
+    "OrderBlockSkill",
     "SessionSkill",
     "TrendSkill",
 ]

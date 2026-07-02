@@ -92,17 +92,37 @@ class MarketStructureSkill(BaseSkill):
         struct = "HH-HL uptrend" if uptrend else "LH-LL downtrend" if downtrend else "range"
 
         if uptrend and last_close > last_high:
-            return self._event(Direction.LONG, "Bullish BOS", struct,
-                               (last_close - last_high) / atr_value, last_low)
+            return self._event(
+                Direction.LONG,
+                "Bullish BOS",
+                struct,
+                (last_close - last_high) / atr_value,
+                last_low,
+            )
         if downtrend and last_close < last_low:
-            return self._event(Direction.SHORT, "Bearish BOS", struct,
-                               (last_low - last_close) / atr_value, last_high)
+            return self._event(
+                Direction.SHORT,
+                "Bearish BOS",
+                struct,
+                (last_low - last_close) / atr_value,
+                last_high,
+            )
         if uptrend and last_close < last_low:
-            return self._event(Direction.SHORT, "Bearish CHoCH", struct,
-                               (last_low - last_close) / atr_value, last_high)
+            return self._event(
+                Direction.SHORT,
+                "Bearish CHoCH",
+                struct,
+                (last_low - last_close) / atr_value,
+                last_high,
+            )
         if downtrend and last_close > last_high:
-            return self._event(Direction.LONG, "Bullish CHoCH", struct,
-                               (last_close - last_high) / atr_value, last_low)
+            return self._event(
+                Direction.LONG,
+                "Bullish CHoCH",
+                struct,
+                (last_close - last_high) / atr_value,
+                last_low,
+            )
 
         # Structure present but no break yet: weak directional bias only.
         if uptrend:

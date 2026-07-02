@@ -56,6 +56,26 @@ def candles_from_prices(
     return candles
 
 
+def ohlc_candles(
+    rows: list[tuple[float, float, float, float]],
+    start: datetime | None = None,
+    step_min: int = 5,
+) -> list[Candle]:
+    """Build a candle series from explicit ``(open, high, low, close)`` rows."""
+    origin = start or datetime(2026, 7, 2, 8, 0, 0)
+    return [
+        Candle(
+            timestamp=origin + timedelta(minutes=step_min * i),
+            open=o,
+            high=h,
+            low=low,
+            close=c,
+            volume=100.0,
+        )
+        for i, (o, h, low, c) in enumerate(rows)
+    ]
+
+
 @pytest.fixture
 def sample_candles() -> list[Candle]:
     """Five consecutive M5 candles."""

@@ -51,18 +51,36 @@ class FakeMt5:
 def _fake_rows() -> list[dict[str, Any]]:
     epoch = int(datetime(2026, 7, 2, 15, 0, tzinfo=UTC).timestamp())
     return [
-        {"time": epoch, "open": 3350.0, "high": 3352.0, "low": 3349.0,
-         "close": 3351.0, "tick_volume": 100},
-        {"time": epoch + 300, "open": 3351.0, "high": 3353.0, "low": 3350.0,
-         "close": 3352.0, "tick_volume": 120},
+        {
+            "time": epoch,
+            "open": 3350.0,
+            "high": 3352.0,
+            "low": 3349.0,
+            "close": 3351.0,
+            "tick_volume": 100,
+        },
+        {
+            "time": epoch + 300,
+            "open": 3351.0,
+            "high": 3353.0,
+            "low": 3350.0,
+            "close": 3352.0,
+            "tick_volume": 120,
+        },
     ]
 
 
 def test_rows_to_candles_converts_fields() -> None:
     epoch = int(datetime(2026, 7, 2, 15, 0, tzinfo=UTC).timestamp())
     rows = [
-        {"time": epoch, "open": 3350.0, "high": 3352.0, "low": 3349.0,
-         "close": 3351.0, "tick_volume": 120},
+        {
+            "time": epoch,
+            "open": 3350.0,
+            "high": 3352.0,
+            "low": 3349.0,
+            "close": 3351.0,
+            "tick_volume": 120,
+        },
     ]
     candles = _rows_to_candles(rows)
     assert len(candles) == 1
