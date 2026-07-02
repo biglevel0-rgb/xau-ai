@@ -60,6 +60,17 @@ def test_empty_provider_never_vetoes() -> None:
     assert result.veto is False
 
 
+def test_calendar_outage_abstains_not_crashes() -> None:
+    class _Broken:
+        def events(self) -> list[NewsEvent]:
+            raise DataProviderError("HTTP 403")
+
+    result = NewsFilterSkill(_Broken()).analyze(_ctx(EVENT_TIME))
+    assert result.veto is False
+    assert result.direction is Direction.NEUTRAL
+    assert "unavailable" in result.evidence[0]
+
+
 def test_csv_provider_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "news.csv"
     path.write_text(

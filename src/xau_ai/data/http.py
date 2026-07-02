@@ -11,6 +11,10 @@ from typing import Any
 from xau_ai.core.exceptions import DataProviderError
 
 
+# Some feeds (e.g. faireconomy) reject urllib's default agent with HTTP 403.
+_DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; xau-ai/0.1)"}
+
+
 def get_json(
     url: str,
     params: dict[str, str] | None = None,
@@ -19,7 +23,9 @@ def get_json(
 ) -> Any:
     """GET ``url`` (with optional query/headers) and parse the JSON body."""
     full_url = f"{url}?{urllib.parse.urlencode(params)}" if params else url
-    request = urllib.request.Request(full_url, headers=headers or {}, method="GET")
+    request = urllib.request.Request(
+        full_url, headers={**_DEFAULT_HEADERS, **(headers or {})}, method="GET"
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             if response.status != 200:

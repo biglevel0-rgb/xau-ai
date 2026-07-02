@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import ClassVar
 
+from xau_ai.core.exceptions import DataProviderError
 from xau_ai.core.models import Direction, MarketContext, SkillResult
 from xau_ai.core.registry import registry
 from xau_ai.data.news.events import NewsEvent, NewsImpact
@@ -48,7 +49,17 @@ class NewsFilterSkill(BaseSkill):
         return None
 
     def analyze(self, ctx: MarketContext) -> SkillResult:
-        event = self._blocking_event(ctx)
+        try:
+            event = self._blocking_event(ctx)
+        except DataProviderError as exc:
+            # The calendar is a protective extra; its outage must never kill
+            # the analysis cycle. Report and abstain.
+            return SkillResult(
+                skill_name=self.name,
+                direction=Direction.NEUTRAL,
+                score=0.0,
+                evidence=(f"news calendar unavailable ({exc})",),
+            )
         if event is not None:
             return SkillResult(
                 skill_name=self.name,
