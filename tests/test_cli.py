@@ -112,6 +112,49 @@ def test_analyze_missing_config_returns_1(
     assert "error" in capsys.readouterr().out
 
 
+def _write_bars(path: Path, symbol: str, tf: str, base: float = 3300.0) -> None:
+    header = "timestamp,open,high,low,close,volume\n"
+    rows = []
+    for i in range(60):
+        price = base + i * 2
+        ts = f"2026-07-02T{13 + i // 12:02d}:{(i % 12) * 5:02d}:00"
+        rows.append(f"{ts},{price},{price + 1},{price - 1},{price},100")
+    (path / f"{symbol}_{tf}.csv").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
+
+
+def test_analyze_multitimeframe_with_related(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_bars(tmp_path, "XAUUSD", "M5")
+    _write_bars(tmp_path, "XAUUSD", "M15")
+    _write_bars(tmp_path, "DXY", "M5", base=100.0)  # correlated instrument
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+symbol: XAUUSD
+timeframes: [M5, M15]
+related_symbols: [DXY]
+risk:
+  risk_per_trade_pct: 0.5
+  min_rr: 2.0
+  max_daily_loss_pct: 3.0
+  max_weekly_loss_pct: 6.0
+validator:
+  confidence_threshold: 0.1
+  weights: {trend: 1.0}
+  required_confirmations: [trend]
+news:
+  block_minutes_before: 15
+  block_minutes_after: 15
+""",
+        encoding="utf-8",
+    )
+    code = main(["analyze", "--dir", str(tmp_path), "--tf", "M5", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "VERDICT" in out
+
+
 _PERMISSIVE_CONFIG = """
 symbol: XAUUSD
 timeframes: [M5]

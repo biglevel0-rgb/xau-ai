@@ -75,3 +75,43 @@ def test_no_candles_raises() -> None:
     provider = FakeProvider({})
     with pytest.raises(DataProviderError, match="no candles"):
         build_context(provider, "XAUUSD", [Timeframe.M5], count=5)
+
+
+class KeyedProvider:
+    """Provider keyed by (symbol, timeframe); raises for unknown keys."""
+
+    def __init__(self, data: dict[tuple[str, Timeframe], list[Candle]]) -> None:
+        self._data = data
+
+    def get_candles(self, symbol: str, timeframe: Timeframe, count: int) -> list[Candle]:
+        key = (symbol, timeframe)
+        if key not in self._data:
+            raise DataProviderError(f"no data for {key}")
+        return self._data[key][-count:]
+
+
+def test_build_context_loads_related() -> None:
+    start = datetime(2026, 7, 2, 15, 0, 0)
+    provider = KeyedProvider(
+        {
+            ("XAUUSD", Timeframe.M5): _series(start, 5, 10),
+            ("DXY", Timeframe.M5): _series(start, 5, 10),
+        }
+    )
+    ctx = build_context(provider, "XAUUSD", [Timeframe.M5], count=10, related={"DXY": Timeframe.M5})
+    assert "DXY" in ctx.related
+    assert len(ctx.related["DXY"]) == 10
+
+
+def test_missing_related_symbol_is_skipped() -> None:
+    start = datetime(2026, 7, 2, 15, 0, 0)
+    provider = KeyedProvider({("XAUUSD", Timeframe.M5): _series(start, 5, 10)})
+    ctx = build_context(provider, "XAUUSD", [Timeframe.M5], count=10, related={"DXY": Timeframe.M5})
+    assert ctx.related == {}  # DXY unavailable -> skipped, no error
+
+
+def test_missing_timeframe_is_skipped() -> None:
+    start = datetime(2026, 7, 2, 15, 0, 0)
+    provider = KeyedProvider({("XAUUSD", Timeframe.M5): _series(start, 5, 10)})
+    ctx = build_context(provider, "XAUUSD", [Timeframe.M1, Timeframe.M5], count=10)
+    assert set(ctx.series) == {Timeframe.M5}  # M1 unavailable -> skipped

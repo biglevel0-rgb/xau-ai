@@ -129,6 +129,8 @@ class Settings(BaseModel):
     sessions: SessionsConfig = Field(default_factory=SessionsConfig)
     news: NewsConfig
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+    # Correlated instruments to load into MarketContext.related (e.g. DXY, US10Y).
+    related_symbols: tuple[str, ...] = ()
 
 
 class Secrets(BaseSettings):

@@ -5,6 +5,9 @@
 
 symbol: XAUUSD
 timeframes: [M1, M5, M15, H1]
+# Correlated instruments loaded into the context for the correlation skill.
+# Provide matching <SYMBOL>_<TF>.csv files (or a live provider) to activate it.
+related_symbols: []   # e.g. [DXY, US10Y, XAGUSD]
 
 risk:
   risk_per_trade_pct: 0.5

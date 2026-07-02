@@ -96,10 +96,12 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
 
     try:
         settings = load_settings(args.config)
-        timeframe = _parse_timeframes(args.tf)[0]
+        signal_tf = _parse_timeframes(args.tf)[0]
         provider = CsvDataProvider(Path(args.dir))
-        ctx = build_context(provider, args.symbol, [timeframe], args.count)
-        signal = Orchestrator(settings, timeframe).analyze(ctx)
+        # Load every configured timeframe (for MTF) + correlated instruments.
+        related = {symbol: signal_tf for symbol in settings.related_symbols}
+        ctx = build_context(provider, args.symbol, settings.timeframes, args.count, related=related)
+        signal = Orchestrator(settings, signal_tf).analyze(ctx)
     except XauAiError as exc:
         print(f"error: {exc}")
         return 1
