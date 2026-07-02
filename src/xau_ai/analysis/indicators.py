@@ -16,6 +16,19 @@ def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
+def vwap(candles: Sequence[Candle]) -> float:
+    """Volume-weighted average price over ``candles`` (typical price = HLC/3)."""
+    numerator = 0.0
+    denominator = 0.0
+    for candle in candles:
+        typical = (candle.high + candle.low + candle.close) / 3.0
+        numerator += typical * candle.volume
+        denominator += candle.volume
+    if denominator <= 0.0:
+        raise ValueError("total volume must be positive to compute VWAP")
+    return numerator / denominator
+
+
 def ema(values: Sequence[float], period: int) -> list[float]:
     """Exponential moving average, one output per input (seeded with values[0])."""
     if period <= 0:

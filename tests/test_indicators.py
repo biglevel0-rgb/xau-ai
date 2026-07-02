@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from xau_ai.analysis.indicators import atr, clamp01, ema
+from xau_ai.analysis.indicators import atr, clamp01, ema, vwap
 from xau_ai.core.models import Candle
 
 
@@ -48,6 +48,30 @@ def _flat_candles(n: int, price: float = 100.0, rng: float = 2.0) -> list[Candle
         Candle(timestamp=ts, open=price, high=price + rng, low=price - rng, close=price, volume=1)
         for _ in range(n)
     ]
+
+
+class TestVwap:
+    def test_equals_typical_when_volume_uniform(self) -> None:
+        ts = datetime(2026, 7, 2, 8, 0, 0)
+        candles = [
+            Candle(timestamp=ts, open=10, high=12, low=6, close=9, volume=100),  # typical 9
+            Candle(timestamp=ts, open=10, high=15, low=9, close=9, volume=100),  # typical 11
+        ]
+        assert vwap(candles) == pytest.approx(10.0)  # (9+11)/2
+
+    def test_weights_by_volume(self) -> None:
+        ts = datetime(2026, 7, 2, 8, 0, 0)
+        candles = [
+            Candle(timestamp=ts, open=9, high=9, low=9, close=9, volume=1),
+            Candle(timestamp=ts, open=99, high=99, low=99, close=99, volume=99),
+        ]
+        assert vwap(candles) == pytest.approx((9 * 1 + 99 * 99) / 100)
+
+    def test_zero_volume_raises(self) -> None:
+        ts = datetime(2026, 7, 2, 8, 0, 0)
+        candle = Candle(timestamp=ts, open=9, high=9, low=9, close=9, volume=0)
+        with pytest.raises(ValueError, match="volume must be positive"):
+            vwap([candle])
 
 
 class TestAtr:
