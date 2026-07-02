@@ -52,7 +52,8 @@ class PerformanceReport(BaseModel):
     max_drawdown_r: float = Field(ge=0.0)
     sharpe: float
     sortino: float
-    recovery_factor: float = Field(ge=0.0)
+    # Net profit / max drawdown; negative when the strategy lost overall.
+    recovery_factor: float
     by_hour_win_rate: dict[int, float] = Field(default_factory=dict)
 
 
@@ -114,7 +115,7 @@ def compute_performance(trades: list[TradeResult]) -> PerformanceReport:
     sortino = mean / downside if downside > 0 else 0.0
 
     max_dd = _drawdown(pnls)
-    recovery = total_r / max_dd if max_dd > 0 else max(total_r, 0.0)
+    recovery = total_r / max_dd if max_dd > 0 else max(total_r, 0.0)  # negative if net loss
 
     return PerformanceReport(
         trades=n,

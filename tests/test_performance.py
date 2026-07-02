@@ -79,3 +79,12 @@ def test_recovery_factor() -> None:
     trades = [_trade(-1.0), _trade(2.0), _trade(2.0)]  # total 3 R, max dd 1 R
     report = compute_performance(trades)
     assert math.isclose(report.recovery_factor, 3.0)
+
+
+def test_recovery_factor_negative_for_net_loss() -> None:
+    # Regression: caught on real market data. A losing strategy must produce a
+    # negative recovery factor, not a validation error.
+    trades = [_trade(-1.0), _trade(-1.0), _trade(0.5)]  # total -1.5 R, dd 2 R
+    report = compute_performance(trades)
+    assert report.recovery_factor == pytest.approx(-0.75)
+    assert report.total_r == pytest.approx(-1.5)
