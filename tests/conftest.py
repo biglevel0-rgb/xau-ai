@@ -28,6 +28,34 @@ def make_candle(
     )
 
 
+def candles_from_prices(
+    prices: list[float],
+    start: datetime | None = None,
+    step_min: int = 5,
+    wick: float = 1.0,
+) -> list[Candle]:
+    """Build a candle series from a list of prices.
+
+    Each bar is centred on its price (open == close == price) with symmetric
+    ``wick`` high/low, so a bar's high/low track its price directly and swing
+    detection stays independent of neighbouring bars.
+    """
+    origin = start or datetime(2026, 7, 2, 8, 0, 0)
+    candles: list[Candle] = []
+    for i, price in enumerate(prices):
+        candles.append(
+            Candle(
+                timestamp=origin + timedelta(minutes=step_min * i),
+                open=price,
+                high=price + wick,
+                low=price - wick,
+                close=price,
+                volume=100.0,
+            )
+        )
+    return candles
+
+
 @pytest.fixture
 def sample_candles() -> list[Candle]:
     """Five consecutive M5 candles."""
