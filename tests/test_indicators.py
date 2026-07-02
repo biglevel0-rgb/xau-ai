@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from xau_ai.analysis.indicators import atr, clamp01, ema, vwap
+from xau_ai.analysis.indicators import atr, clamp01, correlation, ema, vwap
 from xau_ai.core.models import Candle
 
 
@@ -72,6 +72,27 @@ class TestVwap:
         candle = Candle(timestamp=ts, open=9, high=9, low=9, close=9, volume=0)
         with pytest.raises(ValueError, match="volume must be positive"):
             vwap([candle])
+
+
+class TestCorrelation:
+    def test_perfect_positive(self) -> None:
+        xs = [1.0, 2.0, 3.0, 4.0]
+        assert correlation(xs, [2.0, 4.0, 6.0, 8.0]) == pytest.approx(1.0)
+
+    def test_perfect_negative(self) -> None:
+        xs = [1.0, 2.0, 3.0, 4.0]
+        assert correlation(xs, [8.0, 6.0, 4.0, 2.0]) == pytest.approx(-1.0)
+
+    def test_constant_series_is_zero(self) -> None:
+        assert correlation([1.0, 2.0, 3.0], [5.0, 5.0, 5.0]) == 0.0
+
+    def test_length_mismatch_raises(self) -> None:
+        with pytest.raises(ValueError, match="same length"):
+            correlation([1.0, 2.0], [1.0])
+
+    def test_too_few_points_raises(self) -> None:
+        with pytest.raises(ValueError, match="at least two"):
+            correlation([1.0], [1.0])
 
 
 class TestAtr:

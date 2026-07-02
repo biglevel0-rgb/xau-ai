@@ -81,6 +81,8 @@ class MarketContext(BaseModel):
     symbol: str
     as_of: datetime
     series: dict[Timeframe, list[Candle]] = Field(default_factory=dict)
+    # Correlated instruments (e.g. "DXY", "US10Y", "XAGUSD") keyed by symbol.
+    related: dict[str, list[Candle]] = Field(default_factory=dict)
 
     def candles(self, timeframe: Timeframe) -> list[Candle]:
         """Return the series for ``timeframe`` (empty list if absent)."""
@@ -103,6 +105,8 @@ class SkillResult(BaseModel):
     evidence: tuple[str, ...] = ()
     invalidation: str | None = None
     meta: dict[str, float] = Field(default_factory=dict)
+    # A vetoing skill (e.g. news blackout) forces NO_TRADE regardless of votes.
+    veto: bool = False
 
 
 class Signal(BaseModel):

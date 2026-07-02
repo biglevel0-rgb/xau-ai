@@ -130,6 +130,23 @@ def test_no_trade_on_degenerate_atr() -> None:
     assert any("degenerate" in r for r in signal.rejections)
 
 
+def test_veto_forces_no_trade() -> None:
+    gen = SignalGenerator(make_settings(confidence_threshold=0.6))
+    results = [
+        *_long_results(),
+        SkillResult(
+            skill_name="news",
+            direction=Direction.NEUTRAL,
+            score=0.0,
+            evidence=("high-impact news: NFP",),
+            veto=True,
+        ),
+    ]
+    signal = gen.generate(_ctx(), results)
+    assert signal.signal_type is SignalType.NO_TRADE
+    assert any("veto by news" in r for r in signal.rejections)
+
+
 def test_short_signal() -> None:
     gen = SignalGenerator(make_settings(confidence_threshold=0.6))
     ctx = MarketContext(

@@ -6,7 +6,9 @@ unit-tested in isolation and reused across skills (DRY).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
+from statistics import fmean
 
 from xau_ai.core.models import Candle
 
@@ -14,6 +16,22 @@ from xau_ai.core.models import Candle
 def clamp01(value: float) -> float:
     """Clamp ``value`` into the closed interval ``[0.0, 1.0]``."""
     return max(0.0, min(1.0, value))
+
+
+def correlation(xs: Sequence[float], ys: Sequence[float]) -> float:
+    """Pearson correlation of two equal-length series (0.0 if either is constant)."""
+    if len(xs) != len(ys):
+        raise ValueError("series must be the same length")
+    if len(xs) < 2:
+        raise ValueError("need at least two points")
+    mean_x = fmean(xs)
+    mean_y = fmean(ys)
+    cov = math.fsum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
+    var_x = math.fsum((x - mean_x) ** 2 for x in xs)
+    var_y = math.fsum((y - mean_y) ** 2 for y in ys)
+    if var_x <= 0.0 or var_y <= 0.0:
+        return 0.0
+    return cov / math.sqrt(var_x * var_y)
 
 
 def vwap(candles: Sequence[Candle]) -> float:

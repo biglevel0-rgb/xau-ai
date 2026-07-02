@@ -9,6 +9,8 @@ skills with the global registry.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import xau_ai.skills  # noqa: F401  (import side effect: registers built-in skills)
 from xau_ai.config.settings import Settings
 from xau_ai.core.models import MarketContext, Signal, SkillResult, Timeframe
@@ -18,11 +20,23 @@ from xau_ai.skills.base import BaseSkill
 
 
 class Orchestrator:
-    """Run all registered skills and produce a single signal."""
+    """Run all registered skills and produce a single signal.
 
-    def __init__(self, settings: Settings, timeframe: Timeframe = Timeframe.M5) -> None:
+    ``skills`` overrides the default (auto-registered) skill instances — used to
+    inject skills that need external data (news provider, correlation series).
+    """
+
+    def __init__(
+        self,
+        settings: Settings,
+        timeframe: Timeframe = Timeframe.M5,
+        skills: Sequence[BaseSkill] | None = None,
+    ) -> None:
         self._settings = settings
-        self._skills: list[BaseSkill] = [skill_cls() for skill_cls in registry.all()]
+        if skills is not None:
+            self._skills = list(skills)
+        else:
+            self._skills = [skill_cls() for skill_cls in registry.all()]
         self._generator = SignalGenerator(settings, timeframe)
 
     @property

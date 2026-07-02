@@ -46,6 +46,16 @@ class SignalGenerator:
 
     def generate(self, ctx: MarketContext, results: Sequence[SkillResult]) -> Signal:
         """Aggregate ``results``, apply the hard gates, and return the verdict."""
+        vetoes = [r for r in results if r.veto]
+        if vetoes:
+            reasons = tuple(
+                f"veto by {r.skill_name}: {r.evidence[0]}"
+                if r.evidence
+                else f"veto by {r.skill_name}"
+                for r in vetoes
+            )
+            return self._no_trade(ctx, 0.0, reasons, ())
+
         by_name = {r.skill_name: r for r in results}
         agg = self._validator.aggregate(results)
         reasons = self._collect_reasons(agg, by_name)
