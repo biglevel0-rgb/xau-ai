@@ -10,7 +10,6 @@ from typing import Any
 
 from xau_ai.core.exceptions import DataProviderError
 
-
 # Some feeds (e.g. faireconomy) reject urllib's default agent with HTTP 403.
 _DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; xau-ai/0.1)"}
 
