@@ -15,9 +15,26 @@ from pathlib import Path
 
 from xau_ai.config.settings import load_settings
 from xau_ai.core.context import build_context
-from xau_ai.core.exceptions import XauAiError
+from xau_ai.core.exceptions import DataProviderError, XauAiError
 from xau_ai.core.models import MarketContext, Signal, SignalType, Timeframe
+from xau_ai.data.base import DataProvider
 from xau_ai.data.csv_provider import CsvDataProvider
+
+
+def _make_provider(name: str, data_dir: str) -> DataProvider:
+    """Build the selected data provider (CSV for local, TwelveData for cloud)."""
+    if name == "csv":
+        return CsvDataProvider(Path(data_dir))
+    if name == "twelvedata":
+        from xau_ai.config.settings import Secrets
+        from xau_ai.data.twelvedata import TwelveDataProvider
+
+        return TwelveDataProvider(Secrets().twelvedata_api_key)
+    raise DataProviderError(f"unknown provider: {name}")
+
+
+def _add_provider_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--provider", default="csv", choices=["csv", "twelvedata"])
 
 
 def _parse_timeframes(raw: str) -> list[Timeframe]:
@@ -97,7 +114,7 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
     try:
         settings = load_settings(args.config)
         signal_tf = _parse_timeframes(args.tf)[0]
-        provider = CsvDataProvider(Path(args.dir))
+        provider = _make_provider(args.provider, args.dir)
         # Load every configured timeframe (for MTF) + correlated instruments.
         related = {symbol: signal_tf for symbol in settings.related_symbols}
         ctx = build_context(provider, args.symbol, settings.timeframes, args.count, related=related)
@@ -143,7 +160,7 @@ def _cmd_backtest(args: argparse.Namespace) -> int:
     try:
         settings = load_settings(args.config)
         timeframe = _parse_timeframes(args.tf)[0]
-        provider = CsvDataProvider(Path(args.dir))
+        provider = _make_provider(args.provider, args.dir)
         candles = provider.get_candles(args.symbol, timeframe, args.count)
     except XauAiError as exc:
         print(f"error: {exc}")
@@ -181,7 +198,7 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
     try:
         settings = load_settings(args.config)
         timeframe = _parse_timeframes(args.tf)[0]
-        provider = CsvDataProvider(Path(args.dir))
+        provider = _make_provider(args.provider, args.dir)
         candles = provider.get_candles(args.symbol, timeframe, args.count)
         calibrator = Calibrator(settings, timeframe, warmup=args.warmup, symbol=args.symbol)
         result = calibrator.calibrate(candles, metric=args.metric)
@@ -215,27 +232,35 @@ def _build_parser() -> argparse.ArgumentParser:
     show.set_defaults(func=_cmd_show_data)
 
     analyze = sub.add_parser("analyze", help="run all skills and emit a signal")
-    analyze.add_argument("--dir", required=True, help="directory with <SYMBOL>_<TF>.csv files")
+    analyze.add_argument(
+        "--dir", default="data_cache", help="directory with <SYMBOL>_<TF>.csv files"
+    )
     analyze.add_argument("--symbol", default="XAUUSD")
     analyze.add_argument("--tf", default="M5", help="signal timeframe (single)")
     analyze.add_argument("--count", type=int, default=300)
     analyze.add_argument("--config", default="config/settings.yaml")
+    _add_provider_arg(analyze)
     analyze.add_argument(
         "--notify", action="store_true", help="send LONG/SHORT to Telegram (owner-only)"
     )
     analyze.set_defaults(func=_cmd_analyze)
 
     backtest = sub.add_parser("backtest", help="simulate the strategy over history")
-    backtest.add_argument("--dir", required=True, help="directory with <SYMBOL>_<TF>.csv files")
+    backtest.add_argument(
+        "--dir", default="data_cache", help="directory with <SYMBOL>_<TF>.csv files"
+    )
     backtest.add_argument("--symbol", default="XAUUSD")
     backtest.add_argument("--tf", default="M5", help="signal timeframe (single)")
     backtest.add_argument("--count", type=int, default=5000)
     backtest.add_argument("--warmup", type=int, default=60)
     backtest.add_argument("--config", default="config/settings.yaml")
+    _add_provider_arg(backtest)
     backtest.set_defaults(func=_cmd_backtest)
 
     calibrate = sub.add_parser("calibrate", help="tune validator weights on history")
-    calibrate.add_argument("--dir", required=True, help="directory with <SYMBOL>_<TF>.csv files")
+    calibrate.add_argument(
+        "--dir", default="data_cache", help="directory with <SYMBOL>_<TF>.csv files"
+    )
     calibrate.add_argument("--symbol", default="XAUUSD")
     calibrate.add_argument("--tf", default="M5", help="signal timeframe (single)")
     calibrate.add_argument("--count", type=int, default=5000)
@@ -244,6 +269,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--metric", default="expectancy", choices=["expectancy", "profit_factor", "total_r"]
     )
     calibrate.add_argument("--config", default="config/settings.yaml")
+    _add_provider_arg(calibrate)
     calibrate.set_defaults(func=_cmd_calibrate)
     return parser
 

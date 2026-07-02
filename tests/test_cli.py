@@ -112,6 +112,17 @@ def test_analyze_missing_config_returns_1(
     assert "error" in capsys.readouterr().out
 
 
+def test_analyze_twelvedata_without_key_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("TWELVEDATA_API_KEY", raising=False)
+    config = _seed_analyze(tmp_path)
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["analyze", "--provider", "twelvedata", "--tf", "M5", "--config", str(config)])
+    assert code == 1
+    assert "API key" in capsys.readouterr().out
+
+
 def _write_bars(path: Path, symbol: str, tf: str, base: float = 3300.0) -> None:
     header = "timestamp,open,high,low,close,volume\n"
     rows = []
