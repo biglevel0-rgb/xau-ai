@@ -6,8 +6,8 @@
 symbol: XAUUSD
 timeframes: [M1, M5, M15, H1]
 # Correlated instruments loaded into the context for the correlation skill.
-# Provide matching <SYMBOL>_<TF>.csv files (or a live provider) to activate it.
-related_symbols: []   # e.g. [DXY, US10Y, XAGUSD]
+# EURUSD is the free-tier proxy for (inverse) DXY: positive relation to gold.
+related_symbols: [EURUSD]
 
 risk:
   risk_per_trade_pct: 0.5
@@ -28,11 +28,12 @@ validator:
   # Weight keys MUST match skill names. Calibrated on backtest results (Stage 6).
   # Must sum to ~1.0. `session` is a NEUTRAL liquidity filter, not weighted here.
   weights:
-    trend: 0.25
-    market_structure: 0.25
-    liquidity: 0.20
-    order_block: 0.15
-    fvg: 0.15
+    trend: 0.22
+    market_structure: 0.22
+    liquidity: 0.18
+    order_block: 0.13
+    fvg: 0.13
+    correlation: 0.12
   # Skills that MUST agree with the signal direction, else NO_TRADE.
   # Tighten toward full confluence (add liquidity, order_block, fvg) as desired.
   required_confirmations:

@@ -16,7 +16,7 @@ from pathlib import Path
 from xau_ai.config.settings import load_settings
 from xau_ai.core.context import build_context
 from xau_ai.core.exceptions import DataProviderError, XauAiError
-from xau_ai.core.models import MarketContext, Signal, SignalType, Timeframe
+from xau_ai.core.models import Candle, MarketContext, Signal, SignalType, Timeframe
 from xau_ai.data.base import DataProvider
 from xau_ai.data.csv_provider import CsvDataProvider
 
@@ -228,7 +228,13 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
     trade signal.
     """
     from xau_ai.core.orchestrator import Orchestrator
+    from xau_ai.core.registry import registry
     from xau_ai.data.resample import resample
+    from xau_ai.skills.correlation.skill import (
+        DEFAULT_RELATIONSHIPS,
+        CorrelationSkill,
+        Relationship,
+    )
     from xau_ai.validator.validator import Validator
 
     try:
@@ -236,6 +242,15 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
         provider = _make_provider(args.provider, args.dir)
         # One M1 fetch serves M1/M5/M15 via local resampling (API-limit friendly).
         m1 = provider.get_candles(args.symbol, Timeframe.M1, args.count)
+
+        # Correlated instruments (best-effort: a missing one is skipped).
+        related: dict[str, list[Candle]] = {}
+        for rel_symbol in settings.related_symbols:
+            try:
+                related[rel_symbol] = provider.get_candles(rel_symbol, Timeframe.M5, 300)
+            except DataProviderError:
+                pass
+
         ctx = MarketContext(
             symbol=args.symbol,
             as_of=m1[-1].timestamp,
@@ -244,8 +259,18 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
                 Timeframe.M5: resample(m1, Timeframe.M5),
                 Timeframe.M15: resample(m1, Timeframe.M15),
             },
+            related=related,
         )
-        results = Orchestrator(settings, Timeframe.M5).run_skills(ctx)
+
+        # Point the correlation skill at the first available related symbol.
+        skills = [cls() for cls in registry.all() if cls.name != "correlation"]
+        if related:
+            reference = next(iter(related))
+            relationship = DEFAULT_RELATIONSHIPS.get(reference, Relationship.INVERSE)
+            skills.append(CorrelationSkill(reference=reference, relationship=relationship))
+
+        orch = Orchestrator(settings, Timeframe.M5, skills=skills)
+        results = orch.run_skills(ctx)
         agg = Validator(settings.validator).aggregate(results)
     except XauAiError as exc:
         print(f"error: {exc}")

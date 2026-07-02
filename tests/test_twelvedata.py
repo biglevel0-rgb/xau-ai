@@ -72,8 +72,8 @@ def test_maps_symbol_and_interval() -> None:
 
 def test_unmapped_symbol_passes_through() -> None:
     capture = _Capture(_ok_payload())
-    TwelveDataProvider("KEY", transport=capture).get_candles("EURUSD", Timeframe.M5, count=5)
-    assert capture.params["symbol"] == "EURUSD"
+    TwelveDataProvider("KEY", transport=capture).get_candles("GBPUSD", Timeframe.M5, count=5)
+    assert capture.params["symbol"] == "GBPUSD"
 
 
 def test_count_limits_result() -> None:

@@ -24,7 +24,17 @@ class Relationship(StrEnum):
     """How the reference moves relative to gold."""
 
     INVERSE = "inverse"  # DXY, US10Y
-    POSITIVE = "positive"  # Silver
+    POSITIVE = "positive"  # Silver, EURUSD (both anti-dollar)
+
+
+# How well-known references relate to gold. EURUSD is a free-tier proxy for
+# (inverse) DXY: dollar weakens -> both EUR and gold rise.
+DEFAULT_RELATIONSHIPS: dict[str, Relationship] = {
+    "DXY": Relationship.INVERSE,
+    "US10Y": Relationship.INVERSE,
+    "XAGUSD": Relationship.POSITIVE,
+    "EURUSD": Relationship.POSITIVE,
+}
 
 
 @registry.register

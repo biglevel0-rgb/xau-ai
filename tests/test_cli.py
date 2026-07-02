@@ -300,6 +300,35 @@ def test_forecast_no_alert_when_flat(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert "FLAT" in out
 
 
+def test_forecast_with_related_symbol_activates_correlation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_m1_bars(tmp_path)  # rising gold M1
+    _write_bars(tmp_path, "EURUSD", "M5", base=1.10)  # rising EURUSD -> positive corr -> LONG
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        _PERMISSIVE_CONFIG.replace(
+            "weights: {trend: 1.0}", "weights: {trend: 0.5, correlation: 0.5}"
+        )
+        + "related_symbols: [EURUSD]\n",
+        encoding="utf-8",
+    )
+    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "correlation" in out  # correlation skill voted and is listed
+
+
+def test_forecast_missing_related_is_skipped(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_m1_bars(tmp_path)  # no EURUSD file present
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG + "related_symbols: [EURUSD]\n", encoding="utf-8")
+    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    assert code == 0  # missing related must not break the forecast
+
+
 def test_forecast_missing_data_returns_1(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

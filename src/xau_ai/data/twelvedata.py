@@ -38,6 +38,7 @@ _INTERVALS: dict[Timeframe, str] = {
 _DEFAULT_SYMBOL_MAP: dict[str, str] = {
     "XAUUSD": "XAU/USD",
     "XAGUSD": "XAG/USD",
+    "EURUSD": "EUR/USD",
     "US10Y": "US10Y",
     "DXY": "DXY",
 }
