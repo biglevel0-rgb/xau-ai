@@ -283,19 +283,21 @@ def test_forecast_strong_alert_at_threshold(
     assert "STRONG" in out
 
 
-def test_forecast_no_alert_below_threshold(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _write_m1_bars(tmp_path)
+def test_forecast_no_alert_when_flat(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Flat market -> NEUTRAL bias -> never a STRONG alert regardless of threshold.
+    header = "timestamp,open,high,low,close,volume\n"
+    rows = [
+        f"2026-07-02T{7 + i // 60:02d}:{i % 60:02d}:00,3300,3300.5,3299.5,3300,50"
+        for i in range(400)
+    ]
+    (tmp_path / "XAUUSD_M1.csv").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
     config = tmp_path / "config.yaml"
-    config.write_text(
-        _PERMISSIVE_CONFIG.replace("confidence_threshold: 0.1", "confidence_threshold: 0.99"),
-        encoding="utf-8",
-    )
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
     code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
     out = capsys.readouterr().out
     assert code == 0
     assert "STRONG" not in out
+    assert "FLAT" in out
 
 
 def test_forecast_missing_data_returns_1(
