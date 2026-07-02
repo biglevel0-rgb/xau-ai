@@ -9,10 +9,11 @@ services:
       - .env
     environment:
       MODE: forecast                 # forecast = bias every cycle; signal = vetted trades only
+      SCHEDULE: auto                 # session-aware: 240s London/NY, 900s Asia, sleep weekends
       DATA_PROVIDER: twelvedata      # Linux server uses the cloud provider
       SYMBOL: XAUUSD
       SIGNAL_TF: M5
-      ANALYZE_INTERVAL_SECONDS: "300"
+      REPORT_HOUR: "6"               # daily accuracy report after 06:00 UTC
       CONFIG_PATH: config/settings.yaml
     volumes:
       - ./config:/app/config:ro      # edit thresholds/weights without rebuilding

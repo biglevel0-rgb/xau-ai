@@ -146,6 +146,7 @@ class Secrets(BaseSettings):
     telegram_owner_chat_id: int = 0
     oanda_api_token: str = ""
     oanda_account_id: str = ""
+    oanda_env: str = "practice"
     twelvedata_api_key: str = ""
     mt5_login: str = ""
     mt5_password: str = ""

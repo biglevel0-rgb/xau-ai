@@ -30,11 +30,17 @@ def _make_provider(name: str, data_dir: str) -> DataProvider:
         from xau_ai.data.twelvedata import TwelveDataProvider
 
         return TwelveDataProvider(Secrets().twelvedata_api_key)
+    if name == "oanda":
+        from xau_ai.config.settings import Secrets
+        from xau_ai.data.oanda import OandaDataProvider
+
+        secrets = Secrets()
+        return OandaDataProvider(secrets.oanda_api_token, secrets.oanda_env)
     raise DataProviderError(f"unknown provider: {name}")
 
 
 def _add_provider_arg(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--provider", default="csv", choices=["csv", "twelvedata"])
+    parser.add_argument("--provider", default="csv", choices=["csv", "twelvedata", "oanda"])
 
 
 def _parse_timeframes(raw: str) -> list[Timeframe]:
@@ -230,6 +236,7 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
     from xau_ai.core.orchestrator import Orchestrator
     from xau_ai.core.registry import registry
     from xau_ai.data.resample import resample
+    from xau_ai.forecasting.tracker import ForecastTracker
     from xau_ai.skills.correlation.skill import (
         DEFAULT_RELATIONSHIPS,
         CorrelationSkill,
@@ -246,10 +253,8 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
         # Correlated instruments (best-effort: a missing one is skipped).
         related: dict[str, list[Candle]] = {}
         for rel_symbol in settings.related_symbols:
-            try:
+            with contextlib.suppress(DataProviderError):
                 related[rel_symbol] = provider.get_candles(rel_symbol, Timeframe.M5, 300)
-            except DataProviderError:
-                pass
 
         ctx = MarketContext(
             symbol=args.symbol,
@@ -262,16 +267,38 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
             related=related,
         )
 
-        # Point the correlation skill at the first available related symbol.
-        skills = [cls() for cls in registry.all() if cls.name != "correlation"]
+        # Custom-configured skills replace their default registrations.
+        from xau_ai.skills.base import BaseSkill
+
+        excluded = {"correlation"}
+        skills: list[BaseSkill] = []
         if related:
             reference = next(iter(related))
             relationship = DEFAULT_RELATIONSHIPS.get(reference, Relationship.INVERSE)
             skills.append(CorrelationSkill(reference=reference, relationship=relationship))
+        if args.news:
+            from xau_ai.data.news.faireconomy import FaireconomyNewsProvider
+            from xau_ai.skills.news import NewsFilterSkill
+
+            excluded.add("news")
+            cache = Path(args.journal).parent / "news_cache.json"
+            skills.append(
+                NewsFilterSkill(
+                    FaireconomyNewsProvider(cache_path=cache),
+                    block_minutes_before=settings.news.block_minutes_before,
+                    block_minutes_after=settings.news.block_minutes_after,
+                )
+            )
+        skills.extend(cls() for cls in registry.all() if cls.name not in excluded)
 
         orch = Orchestrator(settings, Timeframe.M5, skills=skills)
         results = orch.run_skills(ctx)
         agg = Validator(settings.validator).aggregate(results)
+
+        # Self-verification: grade past forecasts against what actually happened,
+        # then record this one for future grading.
+        tracker = ForecastTracker(args.journal, horizon_min=args.horizon)
+        tracker.evaluate_pending(m1)
     except XauAiError as exc:
         print(f"error: {exc}")
         return 1
@@ -284,11 +311,17 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
     else:
         icon, label = "→", "FLAT"
 
+    tracker.record(ctx.as_of, label, agg.confidence, price)
+
     # High-confidence alert: bias reached the vetted-signal threshold.
     threshold = settings.validator.confidence_threshold
     strong = agg.direction.value != "NEUTRAL" and agg.confidence >= threshold
+    vetoes = [r for r in results if r.veto]
 
     lines = []
+    for veto in vetoes:
+        detail = veto.evidence[0] if veto.evidence else veto.skill_name
+        lines.append(f"⚠️ {detail} — trading not advised")
     if strong:
         lines.append(f"🚨 STRONG {label} — confidence {agg.confidence:.0%} (>= {threshold:.0%})")
     lines.append(f"🔮 {args.symbol} forecast (M5): {icon} {label} {agg.confidence:.0%}")
@@ -322,6 +355,41 @@ def _send_forecast(settings: object, text: str) -> None:
         print("  telegram: sent")
     except NotificationError as exc:
         print(f"  notify error: {exc}")
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    """Daily accuracy summary built from the forecast journal."""
+    from datetime import UTC, datetime
+
+    from xau_ai.forecasting.tracker import ForecastTracker
+
+    try:
+        settings = load_settings(args.config)
+        tracker = ForecastTracker(args.journal)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        stats = tracker.stats(now, window_hours=args.window)
+    except XauAiError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    lines = [f"📊 XAU-AI daily report (last {args.window}h)"]
+    lines.append(f"Forecasts: {stats.total} (pending {stats.pending}, flat {stats.skipped})")
+    if stats.correct + stats.wrong > 0:
+        lines.append(f"Accuracy: {stats.accuracy:.0%} ({stats.correct}✓ / {stats.wrong}✗)")
+        if stats.long_total:
+            lines.append(f"LONG: {stats.long_correct}/{stats.long_total} correct")
+        if stats.short_total:
+            lines.append(f"SHORT: {stats.short_correct}/{stats.short_total} correct")
+    else:
+        lines.append("Accuracy: no graded forecasts yet")
+    lines.append(f"Avg confidence: {stats.avg_confidence:.0%}")
+    lines.append(f"Strong alerts (>=85%): {stats.strong_count}")
+    text = "\n".join(lines)
+    print(text)
+
+    if args.notify:
+        _send_forecast(settings, text)
+    return 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -381,9 +449,19 @@ def _build_parser() -> argparse.ArgumentParser:
     forecast.add_argument("--symbol", default="XAUUSD")
     forecast.add_argument("--count", type=int, default=900, help="M1 bars to fetch")
     forecast.add_argument("--config", default="config/settings.yaml")
+    forecast.add_argument("--journal", default="journal/forecasts.jsonl")
+    forecast.add_argument("--horizon", type=int, default=30, help="grading horizon, minutes")
+    forecast.add_argument("--news", action="store_true", help="enable live economic calendar")
     _add_provider_arg(forecast)
     forecast.add_argument("--notify", action="store_true", help="send to Telegram (owner-only)")
     forecast.set_defaults(func=_cmd_forecast)
+
+    report = sub.add_parser("report", help="accuracy summary from the forecast journal")
+    report.add_argument("--journal", default="journal/forecasts.jsonl")
+    report.add_argument("--window", type=int, default=24, help="hours to summarise")
+    report.add_argument("--config", default="config/settings.yaml")
+    report.add_argument("--notify", action="store_true", help="send to Telegram (owner-only)")
+    report.set_defaults(func=_cmd_report)
     return parser
 
 

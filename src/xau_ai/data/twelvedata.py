@@ -10,10 +10,6 @@ treated as 0.0 (skills that need volume simply abstain).
 
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -22,6 +18,7 @@ from pydantic import ValidationError
 
 from xau_ai.core.exceptions import DataProviderError
 from xau_ai.core.models import Candle, Timeframe
+from xau_ai.data.http import get_json
 
 Transport = Callable[[str, dict[str, str]], dict[str, Any]]
 
@@ -46,16 +43,7 @@ _DEFAULT_SYMBOL_MAP: dict[str, str] = {
 
 def _http_get_json(url: str, params: dict[str, str]) -> dict[str, Any]:
     """Default transport: GET ``url?params`` and parse JSON."""
-    full_url = f"{url}?{urllib.parse.urlencode(params)}"
-    request = urllib.request.Request(full_url, method="GET")
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            if response.status != 200:
-                raise DataProviderError(f"TwelveData HTTP {response.status}")
-            payload = response.read()
-    except urllib.error.URLError as exc:
-        raise DataProviderError(f"TwelveData request failed: {exc}") from exc
-    parsed: dict[str, Any] = json.loads(payload)
+    parsed: dict[str, Any] = get_json(url, params)
     return parsed
 
 

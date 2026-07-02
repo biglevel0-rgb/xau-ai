@@ -261,7 +261,19 @@ def test_forecast_prints_bias(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     _write_m1_bars(tmp_path)
     config = tmp_path / "config.yaml"
     config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
-    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(tmp_path / "forecasts.jsonl"),
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0
     assert "forecast" in out
@@ -277,7 +289,19 @@ def test_forecast_strong_alert_at_threshold(
     _write_m1_bars(tmp_path)
     config = tmp_path / "config.yaml"
     config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
-    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(tmp_path / "forecasts.jsonl"),
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0
     assert "STRONG" in out
@@ -293,7 +317,19 @@ def test_forecast_no_alert_when_flat(tmp_path: Path, capsys: pytest.CaptureFixtu
     (tmp_path / "XAUUSD_M1.csv").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
     config = tmp_path / "config.yaml"
     config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
-    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(tmp_path / "forecasts.jsonl"),
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0
     assert "STRONG" not in out
@@ -313,7 +349,19 @@ def test_forecast_with_related_symbol_activates_correlation(
         + "related_symbols: [EURUSD]\n",
         encoding="utf-8",
     )
-    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(tmp_path / "forecasts.jsonl"),
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0
     assert "correlation" in out  # correlation skill voted and is listed
@@ -325,7 +373,19 @@ def test_forecast_missing_related_is_skipped(
     _write_m1_bars(tmp_path)  # no EURUSD file present
     config = tmp_path / "config.yaml"
     config.write_text(_PERMISSIVE_CONFIG + "related_symbols: [EURUSD]\n", encoding="utf-8")
-    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(tmp_path / "forecasts.jsonl"),
+        ]
+    )
     assert code == 0  # missing related must not break the forecast
 
 
@@ -337,6 +397,58 @@ def test_forecast_missing_data_returns_1(
     code = main(["forecast", "--dir", str(tmp_path), "--config", str(config)])
     assert code == 1
     assert "error" in capsys.readouterr().out
+
+
+def test_forecast_writes_journal(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _write_m1_bars(tmp_path)
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    journal = tmp_path / "forecasts.jsonl"
+    code = main(
+        [
+            "forecast",
+            "--dir",
+            str(tmp_path),
+            "--count",
+            "400",
+            "--config",
+            str(config),
+            "--journal",
+            str(journal),
+        ]
+    )
+    assert code == 0
+    assert journal.is_file()
+    assert "LONG" in journal.read_text(encoding="utf-8")
+
+
+def test_report_summarises_journal(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from datetime import UTC
+    from datetime import datetime as dt
+
+    from xau_ai.forecasting.tracker import ForecastTracker
+
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    journal = tmp_path / "forecasts.jsonl"
+    tracker = ForecastTracker(journal)
+    now = dt.now(UTC).replace(tzinfo=None)
+    tracker.record(now, "LONG", 0.9, 3300.0)
+    code = main(["report", "--journal", str(journal), "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "daily report" in out
+    assert "Forecasts: 1" in out
+    assert "Strong alerts" in out
+
+
+def test_report_empty_journal(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["report", "--journal", str(tmp_path / "none.jsonl"), "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "no graded forecasts yet" in out
 
 
 AS_OF = datetime(2026, 7, 2, 15, 0, 0)

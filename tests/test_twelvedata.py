@@ -158,7 +158,7 @@ def test_http_get_json_urlerror(monkeypatch: pytest.MonkeyPatch) -> None:
         raise urllib.error.URLError("no network")
 
     monkeypatch.setattr(urllib.request, "urlopen", _boom)
-    with pytest.raises(DataProviderError, match="request failed"):
+    with pytest.raises(DataProviderError, match="failed"):
         _http_get_json("https://x", {})
 
 
