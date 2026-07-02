@@ -8,6 +8,7 @@ services:
     env_file:
       - .env
     environment:
+      MODE: forecast                 # forecast = bias every cycle; signal = vetted trades only
       DATA_PROVIDER: twelvedata      # Linux server uses the cloud provider
       SYMBOL: XAUUSD
       SIGNAL_TF: M5

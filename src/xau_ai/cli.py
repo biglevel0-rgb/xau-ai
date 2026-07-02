@@ -220,6 +220,80 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_forecast(args: argparse.Namespace) -> int:
+    """Directional bias forecast: always reports which side currently outweighs.
+
+    Unlike ``analyze`` this does NOT apply the confidence/RR gates — it exposes
+    the validator's raw vote. It is a market-direction estimate, not a vetted
+    trade signal.
+    """
+    from xau_ai.core.orchestrator import Orchestrator
+    from xau_ai.data.resample import resample
+    from xau_ai.validator.validator import Validator
+
+    try:
+        settings = load_settings(args.config)
+        provider = _make_provider(args.provider, args.dir)
+        # One M1 fetch serves M1/M5/M15 via local resampling (API-limit friendly).
+        m1 = provider.get_candles(args.symbol, Timeframe.M1, args.count)
+        ctx = MarketContext(
+            symbol=args.symbol,
+            as_of=m1[-1].timestamp,
+            series={
+                Timeframe.M1: m1,
+                Timeframe.M5: resample(m1, Timeframe.M5),
+                Timeframe.M15: resample(m1, Timeframe.M15),
+            },
+        )
+        results = Orchestrator(settings, Timeframe.M5).run_skills(ctx)
+        agg = Validator(settings.validator).aggregate(results)
+    except XauAiError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    price = m1[-1].close
+    if agg.direction.value == "LONG":
+        icon, label = "⬆", "LONG"
+    elif agg.direction.value == "SHORT":
+        icon, label = "⬇", "SHORT"
+    else:
+        icon, label = "→", "FLAT"
+
+    lines = [
+        f"🔮 {args.symbol} forecast (M5): {icon} {label} {agg.confidence:.0%}",
+        f"Price: {price:.2f} @ {ctx.as_of.strftime('%H:%M')} UTC",
+    ]
+    if agg.agreeing:
+        lines.append("For: " + ", ".join(agg.agreeing))
+    if agg.disagreeing:
+        lines.append("Against: " + ", ".join(agg.disagreeing))
+    lines.append("(bias estimate, not a vetted trade signal)")
+    text = "\n".join(lines)
+    print(text)
+
+    if args.notify:
+        _send_forecast(settings, text)
+    return 0
+
+
+def _send_forecast(settings: object, text: str) -> None:
+    from xau_ai.config.settings import Secrets, Settings
+    from xau_ai.core.exceptions import NotificationError
+    from xau_ai.notifications.telegram import TelegramNotifier
+
+    assert isinstance(settings, Settings)
+    if not settings.notifications.telegram.enabled:
+        print("  (telegram disabled)")
+        return
+    secrets = Secrets()
+    notifier = TelegramNotifier(secrets.telegram_bot_token, secrets.telegram_owner_chat_id)
+    try:
+        notifier.send_text(text)
+        print("  telegram: sent")
+    except NotificationError as exc:
+        print(f"  notify error: {exc}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xau", description="XAU-AI command line.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -271,6 +345,15 @@ def _build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--config", default="config/settings.yaml")
     _add_provider_arg(calibrate)
     calibrate.set_defaults(func=_cmd_calibrate)
+
+    forecast = sub.add_parser("forecast", help="directional bias estimate (no gates)")
+    forecast.add_argument("--dir", default="data_cache", help="CSV dir (csv provider only)")
+    forecast.add_argument("--symbol", default="XAUUSD")
+    forecast.add_argument("--count", type=int, default=900, help="M1 bars to fetch")
+    forecast.add_argument("--config", default="config/settings.yaml")
+    _add_provider_arg(forecast)
+    forecast.add_argument("--notify", action="store_true", help="send to Telegram (owner-only)")
+    forecast.set_defaults(func=_cmd_forecast)
     return parser
 
 

@@ -88,6 +88,19 @@ def test_notify_respects_send_on() -> None:
     assert transport.calls == []
 
 
+def test_send_text_delivers_to_owner() -> None:
+    transport = _Capture()
+    TelegramNotifier("TOKEN", OWNER, transport=transport).send_text("hello")
+    _url, payload = transport.calls[0]
+    assert payload["chat_id"] == OWNER
+    assert payload["text"] == "hello"
+
+
+def test_send_text_without_token_raises() -> None:
+    with pytest.raises(NotificationError, match="not configured"):
+        TelegramNotifier("", OWNER, transport=_Capture()).send_text("hello")
+
+
 def test_missing_token_raises() -> None:
     notifier = TelegramNotifier("", OWNER, transport=_Capture())
     with pytest.raises(NotificationError, match="not configured"):

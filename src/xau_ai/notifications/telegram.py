@@ -60,14 +60,17 @@ class TelegramNotifier:
         """Send ``signal`` to the owner if its type is enabled; else skip."""
         if signal.signal_type not in self._send_on:
             return False
+        self.send_text(format_signal(signal))
+        return True
+
+    def send_text(self, text: str) -> None:
+        """Send a raw text message to the owner (used by forecast mode)."""
         if not self._token or self._owner_chat_id == 0:
             raise NotificationError("Telegram bot token / owner chat id not configured")
-
         url = f"https://api.telegram.org/bot{self._token}/sendMessage"
         payload: dict[str, Any] = {
             "chat_id": self._owner_chat_id,  # owner-only: the sole destination
-            "text": format_signal(signal),
+            "text": text,
             "disable_web_page_preview": True,
         }
         self._transport(url, payload)
-        return True

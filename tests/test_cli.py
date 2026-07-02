@@ -247,6 +247,38 @@ def test_calibrate_missing_file_returns_1(
     assert "error" in capsys.readouterr().out
 
 
+def _write_m1_bars(path: Path, symbol: str = "XAUUSD", n: int = 400) -> None:
+    header = "timestamp,open,high,low,close,volume\n"
+    rows = []
+    for i in range(n):
+        price = 3300.0 + i * 0.5
+        ts = f"2026-07-02T{7 + i // 60:02d}:{i % 60:02d}:00"
+        rows.append(f"{ts},{price},{price + 0.5},{price - 0.5},{price},50")
+    (path / f"{symbol}_M1.csv").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
+
+
+def test_forecast_prints_bias(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _write_m1_bars(tmp_path)
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "forecast" in out
+    assert ("LONG" in out) or ("SHORT" in out) or ("FLAT" in out)
+    assert "not a vetted trade signal" in out
+
+
+def test_forecast_missing_data_returns_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["forecast", "--dir", str(tmp_path), "--config", str(config)])
+    assert code == 1
+    assert "error" in capsys.readouterr().out
+
+
 AS_OF = datetime(2026, 7, 2, 15, 0, 0)
 
 
