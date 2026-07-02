@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta
 
+import pytest
+
 from xau_ai.core.models import Direction
 from xau_ai.performance.metrics import TradeOutcome, TradeResult, compute_performance
 
