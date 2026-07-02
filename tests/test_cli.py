@@ -105,3 +105,52 @@ def test_analyze_missing_config_returns_1(
     code = main(["analyze", "--dir", str(tmp_path), "--tf", "M5", "--config", "nope.yaml"])
     assert code == 1
     assert "error" in capsys.readouterr().out
+
+
+_PERMISSIVE_CONFIG = """
+symbol: XAUUSD
+timeframes: [M5]
+risk:
+  risk_per_trade_pct: 0.5
+  min_rr: 2.0
+  max_daily_loss_pct: 3.0
+  max_weekly_loss_pct: 6.0
+validator:
+  confidence_threshold: 0.1
+  weights: {trend: 1.0}
+  required_confirmations: [trend]
+news:
+  block_minutes_before: 15
+  block_minutes_after: 15
+"""
+
+
+def test_backtest_prints_report(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = _seed_analyze(tmp_path)
+    config_path.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(
+        [
+            "backtest",
+            "--dir",
+            str(tmp_path),
+            "--tf",
+            "M5",
+            "--warmup",
+            "55",
+            "--config",
+            str(config_path),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "BACKTEST REPORT" in out
+
+
+def test_backtest_missing_file_returns_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["backtest", "--dir", str(tmp_path), "--tf", "M5", "--config", str(config_path)])
+    assert code == 1
+    assert "error" in capsys.readouterr().out

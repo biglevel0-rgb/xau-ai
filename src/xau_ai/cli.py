@@ -9,6 +9,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from pathlib import Path
 
@@ -106,6 +107,46 @@ def _cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_backtest(args: argparse.Namespace) -> int:
+    from xau_ai.backtesting.backtester import Backtester
+    from xau_ai.core.orchestrator import Orchestrator
+    from xau_ai.performance.metrics import compute_performance
+
+    try:
+        settings = load_settings(args.config)
+        timeframe = _parse_timeframes(args.tf)[0]
+        provider = CsvDataProvider(Path(args.dir))
+        candles = provider.get_candles(args.symbol, timeframe, args.count)
+    except XauAiError as exc:
+        print(f"error: {exc}")
+        return 1
+
+    source = Orchestrator(settings, timeframe)
+    backtester = Backtester(source, args.symbol, timeframe, warmup=args.warmup)
+    report = compute_performance(backtester.run(candles))
+    _print_report(report, bars=len(candles))
+    return 0
+
+
+def _print_report(report: object, bars: int) -> None:
+    from xau_ai.performance.metrics import PerformanceReport
+
+    assert isinstance(report, PerformanceReport)
+    print("-" * 44)
+    print(f"  BACKTEST REPORT  ({bars} bars)")
+    print("-" * 44)
+    print(f"  Trades:          {report.trades}")
+    print(f"  Win rate:        {report.win_rate:.1%}")
+    print(f"  Total:           {report.total_r:+.2f} R")
+    print(f"  Expectancy:      {report.expectancy_r:+.2f} R")
+    print(f"  Profit factor:   {report.profit_factor:.2f}")
+    print(f"  Max drawdown:    {report.max_drawdown_r:.2f} R")
+    print(f"  Sharpe:          {report.sharpe:.2f}")
+    print(f"  Sortino:         {report.sortino:.2f}")
+    print(f"  Recovery factor: {report.recovery_factor:.2f}")
+    print("-" * 44)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xau", description="XAU-AI command line.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -124,6 +165,15 @@ def _build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--count", type=int, default=300)
     analyze.add_argument("--config", default="config/settings.yaml")
     analyze.set_defaults(func=_cmd_analyze)
+
+    backtest = sub.add_parser("backtest", help="simulate the strategy over history")
+    backtest.add_argument("--dir", required=True, help="directory with <SYMBOL>_<TF>.csv files")
+    backtest.add_argument("--symbol", default="XAUUSD")
+    backtest.add_argument("--tf", default="M5", help="signal timeframe (single)")
+    backtest.add_argument("--count", type=int, default=5000)
+    backtest.add_argument("--warmup", type=int, default=60)
+    backtest.add_argument("--config", default="config/settings.yaml")
+    backtest.set_defaults(func=_cmd_backtest)
     return parser
 
 
@@ -132,10 +182,8 @@ def _force_utf8_output() -> None:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
-            try:
+            with contextlib.suppress(ValueError, OSError):
                 reconfigure(encoding="utf-8", errors="replace")
-            except (ValueError, OSError):
-                pass
 
 
 def main(argv: list[str] | None = None) -> int:
