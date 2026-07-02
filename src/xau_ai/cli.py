@@ -259,10 +259,15 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
     else:
         icon, label = "→", "FLAT"
 
-    lines = [
-        f"🔮 {args.symbol} forecast (M5): {icon} {label} {agg.confidence:.0%}",
-        f"Price: {price:.2f} @ {ctx.as_of.strftime('%H:%M')} UTC",
-    ]
+    # High-confidence alert: bias reached the vetted-signal threshold.
+    threshold = settings.validator.confidence_threshold
+    strong = agg.direction.value != "NEUTRAL" and agg.confidence >= threshold
+
+    lines = []
+    if strong:
+        lines.append(f"🚨 STRONG {label} — confidence {agg.confidence:.0%} (>= {threshold:.0%})")
+    lines.append(f"🔮 {args.symbol} forecast (M5): {icon} {label} {agg.confidence:.0%}")
+    lines.append(f"Price: {price:.2f} @ {ctx.as_of.strftime('%H:%M')} UTC")
     if agg.agreeing:
         lines.append("For: " + ", ".join(agg.agreeing))
     if agg.disagreeing:

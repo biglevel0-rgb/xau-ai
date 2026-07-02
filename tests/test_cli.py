@@ -269,6 +269,35 @@ def test_forecast_prints_bias(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert "not a vetted trade signal" in out
 
 
+def test_forecast_strong_alert_at_threshold(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Permissive config: threshold 0.1, only trend weighted -> a steady uptrend
+    # easily clears the threshold and must produce the STRONG alert line.
+    _write_m1_bars(tmp_path)
+    config = tmp_path / "config.yaml"
+    config.write_text(_PERMISSIVE_CONFIG, encoding="utf-8")
+    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "STRONG" in out
+
+
+def test_forecast_no_alert_below_threshold(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_m1_bars(tmp_path)
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        _PERMISSIVE_CONFIG.replace("confidence_threshold: 0.1", "confidence_threshold: 0.99"),
+        encoding="utf-8",
+    )
+    code = main(["forecast", "--dir", str(tmp_path), "--count", "400", "--config", str(config)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "STRONG" not in out
+
+
 def test_forecast_missing_data_returns_1(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
