@@ -6,7 +6,38 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from xau_ai.config.settings import (
+    NewsConfig,
+    RiskConfig,
+    Settings,
+    ValidatorConfig,
+)
 from xau_ai.core.models import Candle, MarketContext, Timeframe
+
+
+def make_settings(
+    confidence_threshold: float = 0.6,
+    required_confirmations: tuple[str, ...] = (),
+    min_rr: float = 2.0,
+    weights: dict[str, float] | None = None,
+) -> Settings:
+    """Build a Settings object for tests without touching disk."""
+    return Settings(
+        symbol="XAUUSD",
+        timeframes=(Timeframe.M5,),
+        risk=RiskConfig(
+            risk_per_trade_pct=0.5,
+            min_rr=min_rr,
+            max_daily_loss_pct=3.0,
+            max_weekly_loss_pct=6.0,
+        ),
+        validator=ValidatorConfig(
+            confidence_threshold=confidence_threshold,
+            weights=weights or {"trend": 0.5, "market_structure": 0.5},
+            required_confirmations=required_confirmations,
+        ),
+        news=NewsConfig(block_minutes_before=15, block_minutes_after=15),
+    )
 
 
 def make_candle(

@@ -58,3 +58,50 @@ def test_trailing_comma_in_tf_is_ignored(
 def test_all_empty_tf_exits(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="no timeframes"):
         main(["show-data", "--dir", str(tmp_path), "--tf", " , "])
+
+
+def _seed_analyze(tmp_path: Path) -> Path:
+    header = "timestamp,open,high,low,close,volume\n"
+    rows = []
+    for i in range(60):
+        price = 3300.0 + i * 2
+        ts = f"2026-07-02T{13 + i // 12:02d}:{(i % 12) * 5:02d}:00"
+        rows.append(f"{ts},{price},{price + 1},{price - 1},{price},100")
+    (tmp_path / "XAUUSD_M5.csv").write_text(header + "\n".join(rows) + "\n", encoding="utf-8")
+    return tmp_path / "config.yaml"
+
+
+def test_analyze_prints_verdict(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    config_path = _seed_analyze(tmp_path)
+    config_path.write_text(
+        """
+symbol: XAUUSD
+timeframes: [M5]
+risk:
+  risk_per_trade_pct: 0.5
+  min_rr: 2.0
+  max_daily_loss_pct: 3.0
+  max_weekly_loss_pct: 6.0
+validator:
+  confidence_threshold: 0.1
+  weights: {trend: 1.0}
+  required_confirmations: [trend]
+news:
+  block_minutes_before: 15
+  block_minutes_after: 15
+""",
+        encoding="utf-8",
+    )
+    code = main(["analyze", "--dir", str(tmp_path), "--tf", "M5", "--config", str(config_path)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "VERDICT" in out
+
+
+def test_analyze_missing_config_returns_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _seed_analyze(tmp_path)
+    code = main(["analyze", "--dir", str(tmp_path), "--tf", "M5", "--config", "nope.yaml"])
+    assert code == 1
+    assert "error" in capsys.readouterr().out

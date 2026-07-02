@@ -11,18 +11,30 @@ risk:
   min_rr: 2.0
   max_daily_loss_pct: 3.0
   max_weekly_loss_pct: 6.0
+  # Trade-plan construction.
+  stop_atr_mult: 1.5           # stop distance = 1.5 * ATR
+  tp_rr_multiples: [1.0, 2.0, 3.0]
+  primary_tp_index: 1          # RR is reported/gated against TP2 (2R)
+  atr_period: 14
+  account_balance: 10000.0
+  contract_size: 100.0         # XAUUSD: 1 lot = 100 oz
+  lot_step: 0.01
 
 validator:
   confidence_threshold: 0.85
-  # Weights are calibrated on backtest results (Stage 6). Must sum to ~1.0.
+  # Weight keys MUST match skill names. Calibrated on backtest results (Stage 6).
+  # Must sum to ~1.0. `session` is a NEUTRAL liquidity filter, not weighted here.
   weights:
-    trend: 0.20
-    market_structure: 0.20
-    liquidity: 0.15
-    order_blocks: 0.15
+    trend: 0.25
+    market_structure: 0.25
+    liquidity: 0.20
+    order_block: 0.15
     fvg: 0.15
-    volume: 0.15
-  # Hard conditions — if any fails, the result is NO_TRADE regardless of score.
+  # Skills that MUST agree with the signal direction, else NO_TRADE.
+  # Tighten toward full confluence (add liquidity, order_block, fvg) as desired.
+  required_confirmations:
+    - trend
+    - market_structure
   hard_conditions:
     - min_rr
     - no_high_impact_news
