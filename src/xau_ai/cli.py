@@ -305,11 +305,11 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
 
     price = m1[-1].close
     if agg.direction.value == "LONG":
-        icon, label = "⬆", "LONG"
+        icon, label = "🟢", "LONG"
     elif agg.direction.value == "SHORT":
-        icon, label = "⬇", "SHORT"
+        icon, label = "🔴", "SHORT"
     else:
-        icon, label = "→", "FLAT"
+        icon, label = "⚪", "FLAT"
 
     tracker.record(ctx.as_of, label, agg.confidence, price)
 
@@ -324,7 +324,7 @@ def _cmd_forecast(args: argparse.Namespace) -> int:
         lines.append(f"⚠️ {detail} — trading not advised")
     if strong:
         lines.append(f"🚨 STRONG {label} — confidence {agg.confidence:.0%} (>= {threshold:.0%})")
-    lines.append(f"🔮 {args.symbol} forecast (M5): {icon} {label} {agg.confidence:.0%}")
+    lines.append(f"{icon} {label} {agg.confidence:.0%} — {args.symbol} forecast (M5)")
     lines.append(f"Price: {price:.2f} @ {ctx.as_of.strftime('%H:%M')} UTC")
     if agg.agreeing:
         lines.append("For: " + ", ".join(agg.agreeing))
