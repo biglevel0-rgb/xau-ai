@@ -81,6 +81,14 @@ init_report_markers
 
 while true; do
     if [ "$SCHEDULE" = "auto" ] && market_closed; then
+        # Tell the owner once per weekend that silence is intentional.
+        wk=$(date -u +%G-W%V)
+        if [ "$(cat journal/.weekend_notice 2>/dev/null)" != "$wk" ]; then
+            xau notify --config "${CONFIG}" \
+                --text "💤 Рынок золота закрыт (выходные). Прогнозы возобновятся в воскресенье ~22:00 UTC." \
+                && echo "$wk" > journal/.weekend_notice \
+                || echo "weekend notice failed (continuing)"
+        fi
         echo "market closed (weekend); sleeping 30m"
         sleep 1800
         continue

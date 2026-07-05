@@ -68,6 +68,7 @@ def test_maps_symbol_and_interval() -> None:
     assert capture.params["interval"] == "15min"
     assert capture.params["apikey"] == "KEY"
     assert capture.params["order"] == "ASC"
+    assert capture.params["timezone"] == "UTC"
 
 
 def test_unmapped_symbol_passes_through() -> None:

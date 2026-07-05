@@ -541,3 +541,24 @@ def test_maybe_notify_reports_error_without_token(
 class _NoSecrets:
     telegram_bot_token = ""
     telegram_owner_chat_id = 0
+
+
+def test_notify_command_respects_disabled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        _PERMISSIVE_CONFIG + "notifications:\n  telegram:\n    enabled: false\n",
+        encoding="utf-8",
+    )
+    code = main(["notify", "--text", "hello", "--config", str(config)])
+    assert code == 0
+    assert "disabled" in capsys.readouterr().out
+
+
+def test_notify_command_missing_config_returns_1(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code = main(["notify", "--text", "hello", "--config", "nope.yaml"])
+    assert code == 1
+    assert "error" in capsys.readouterr().out

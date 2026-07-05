@@ -403,6 +403,17 @@ def _cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_notify(args: argparse.Namespace) -> int:
+    """Send an arbitrary owner-only Telegram message (used by the service loop)."""
+    try:
+        settings = load_settings(args.config)
+    except XauAiError as exc:
+        print(f"error: {exc}")
+        return 1
+    _send_forecast(settings, args.text)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xau", description="XAU-AI command line.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -474,6 +485,11 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument("--config", default="config/settings.yaml")
     report.add_argument("--notify", action="store_true", help="send to Telegram (owner-only)")
     report.set_defaults(func=_cmd_report)
+
+    notify = sub.add_parser("notify", help="send a text message to the owner")
+    notify.add_argument("--text", required=True)
+    notify.add_argument("--config", default="config/settings.yaml")
+    notify.set_defaults(func=_cmd_notify)
     return parser
 
 

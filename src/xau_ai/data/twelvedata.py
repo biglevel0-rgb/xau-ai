@@ -74,6 +74,9 @@ class TwelveDataProvider:
             "apikey": self._api_key,
             "format": "JSON",
             "order": "ASC",
+            # Without this the API returns exchange-local timestamps, which
+            # skews session detection and forecast time labels.
+            "timezone": "UTC",
         }
         payload = self._transport(_BASE_URL, params)
 
